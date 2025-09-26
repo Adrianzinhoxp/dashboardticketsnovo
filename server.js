@@ -291,10 +291,18 @@ app.get("/api/tickets/stats", (req, res) => {
   const todayTickets = sampleTickets.filter((ticket) => new Date(ticket.closedAt) >= today)
 
   const totalDuration = sampleTickets.reduce((sum, ticket) => {
-    const [hours, minutes] = ticket.duration.split("h ")
-    const totalMinutes = Number.parseInt(hours) * 60 + Number.parseInt(minutes.replace("m", ""))
-    return sum + totalMinutes
-  }, 0)
+  if (!ticket.duration || typeof ticket.duration !== "string") {
+    return sum; // ignora tickets sem duração válida
+  }
+
+  const [hours, minutes] = ticket.duration.split("h ");
+  const totalMinutes =
+    (parseInt(hours, 10) || 0) * 60 +
+    (parseInt((minutes || "").replace("m", ""), 10) || 0);
+
+  return sum + totalMinutes;
+}, 0);
+
 
   const avgDurationMinutes = Math.floor(totalDuration / sampleTickets.length)
   const avgHours = Math.floor(avgDurationMinutes / 60)
