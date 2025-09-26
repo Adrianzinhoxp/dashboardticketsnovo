@@ -90,7 +90,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <div class="relative">
-                            <img src="https://media.discordapp.net/attachments/1414044312890769448/1414399293476966430/dacacacscs.png" 
+                            <img src="https://media.discordapp.net/attachments/1414044312890769448/1414399293476966430/dacacacscs.png?ex=68d7d13d&is=68d67fbd&hm=33c0ecc00e31b3a60b93c408076348879c6d97a3aca8e34733fd723935cbb684&=&format=webp&quality=lossless&width=928&height=928" 
                                  alt="Logo" class="h-16 w-16 rounded-xl shadow-lg ring-4 ring-indigo-200">
                             <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-3 border-white animate-pulse"></div>
                         </div>
@@ -184,7 +184,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="relative">
                         <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400"></i>
-                        <input type="text" id="searchInput" placeholder="Buscar por usuário ou ID..." 
+                        <input type="text" id="searchInput" placeholder="Buscar por usuário, ID ou oficial..." 
                                class="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300">
                     </div>
                     <select id="categoryFilter" class="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-300">
@@ -291,6 +291,7 @@
         let filteredTickets = [];
         let currentPage = 1;
         const ticketsPerPage = 10;
+        let isLoading = false;
 
         // Inicializar
         document.addEventListener('DOMContentLoaded', function() {
@@ -298,38 +299,85 @@
             loadStats();
             loadTickets();
             setupFilters();
+            setupKeyboardShortcuts();
+            startAutoRefresh();
         });
 
-        // Auto-refresh a cada 30 segundos
-        setInterval(() => {
-            loadStats();
-            loadTickets();
-        }, 30000);
+        // Auto-refresh melhorado
+        function startAutoRefresh() {
+            setInterval(() => {
+                if (!isLoading) {
+                    loadStats();
+                    loadTickets();
+                }
+            }, 30000);
+        }
+
+        // Atalhos de teclado
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+                if (e.key === 'F5') {
+                    e.preventDefault();
+                    refreshData();
+                }
+                if (e.ctrlKey && e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    changePage(currentPage - 1);
+                }
+                if (e.ctrlKey && e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    changePage(currentPage + 1);
+                }
+            });
+        }
 
         async function loadStats() {
             try {
                 const response = await fetch('/api/tickets/stats');
+                if (!response.ok) throw new Error('Erro na resposta');
+                
                 const stats = await response.json();
                 
-                document.getElementById('totalClosed').textContent = stats.totalClosed.toLocaleString();
-                document.getElementById('todayClosed').textContent = stats.todayClosed;
+                // Animação dos números
+                animateCounter('totalClosed', stats.totalClosed);
+                animateCounter('todayClosed', stats.todayClosed);
                 document.getElementById('avgTime').textContent = stats.avgResolutionTime;
                 document.getElementById('satisfaction').textContent = stats.satisfactionRate + '/5';
+                
+                // Adicionar efeito de sucesso
+                showNotification('Estatísticas atualizadas!', 'success');
             } catch (error) {
                 console.error('Erro ao carregar estatísticas:', error);
+                showNotification('Erro ao carregar estatísticas', 'error');
             }
         }
 
         async function loadTickets() {
+            if (isLoading) return;
+            
             try {
+                isLoading = true;
+                showLoadingState();
+                
                 const response = await fetch('/api/tickets/closed');
+                if (!response.ok) throw new Error('Erro na resposta');
+                
                 allTickets = await response.json();
                 filteredTickets = [...allTickets];
+                
                 renderTickets();
                 renderPagination();
+                
+                showNotification(`${allTickets.length} tickets carregados!`, 'success');
             } catch (error) {
                 console.error('Erro ao carregar tickets:', error);
                 showError();
+                showNotification('Erro ao carregar tickets', 'error');
+            } finally {
+                isLoading = false;
             }
         }
 
@@ -338,7 +386,13 @@
             const categoryFilter = document.getElementById('categoryFilter');
             const priorityFilter = document.getElementById('priorityFilter');
 
-            searchInput.addEventListener('input', applyFilters);
+            // Debounce para busca
+            let searchTimeout;
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(applyFilters, 300);
+            });
+
             categoryFilter.addEventListener('change', applyFilters);
             priorityFilter.addEventListener('change', applyFilters);
         }
@@ -350,16 +404,20 @@
 
             filteredTickets = allTickets.filter(ticket => {
                 const matchesSearch = ticket.user.name.toLowerCase().includes(searchTerm) ||
-                                    ticket.id.toLowerCase().includes(searchTerm);
+                                    ticket.id.toLowerCase().includes(searchTerm) ||
+                                    ticket.closedBy.toLowerCase().includes(searchTerm);
                 const matchesCategory = categoryFilter === 'all' || ticket.category === categoryFilter;
                 const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter;
 
                 return matchesSearch && matchesCategory && matchesPriority;
             });
 
-            currentPage = 1; // Reset para primeira página
+            currentPage = 1;
             renderTickets();
             renderPagination();
+            
+            // Feedback visual
+            showNotification(`${filteredTickets.length} tickets encontrados`, 'info');
         }
 
         function renderTickets() {
@@ -371,7 +429,10 @@
             const endIndex = startIndex + ticketsPerPage;
             const ticketsToShow = filteredTickets.slice(startIndex, endIndex);
             
-            ticketCount.textContent = `${filteredTickets.length} ticket(s) encontrado(s) • Página ${currentPage} de ${totalPages}`;
+            ticketCount.innerHTML = `
+                <span class="font-bold text-white">${filteredTickets.length}</span> ticket(s) encontrado(s) • 
+                Página <span class="font-bold text-white">${currentPage}</span> de <span class="font-bold text-white">${totalPages}</span>
+            `;
 
             if (ticketsToShow.length === 0) {
                 tbody.innerHTML = `
@@ -382,6 +443,9 @@
                             </div>
                             <p class="text-gray-500 font-medium text-lg">Nenhum ticket encontrado</p>
                             <p class="text-gray-400 text-sm mt-2">Tente ajustar os filtros de busca</p>
+                            <button onclick="clearFilters()" class="mt-4 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                                Limpar Filtros
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -389,60 +453,70 @@
                 return;
             }
 
-            tbody.innerHTML = ticketsToShow.map(ticket => `
-                <tr class="table-row border-b border-gray-100">
+            tbody.innerHTML = ticketsToShow.map((ticket, index) => `
+                <tr class="table-row border-b border-gray-100 animate-fade-in" style="animation-delay: ${index * 0.1}s">
                     <td class="px-6 py-4">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-indigo-100 text-indigo-800">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-indigo-100 text-indigo-800 hover:bg-indigo-200 transition-colors cursor-pointer" 
+                              onclick="copyToClipboard('${ticket.id}')" title="Clique para copiar">
                             ${ticket.id}
                         </span>
                     </td>
                     <td class="px-6 py-4">
-                        <div class="flex items-center gap-3">
-                            <img class="h-10 w-10 rounded-full border-2 border-indigo-200 shadow-sm" 
-                                 src="${ticket.user.avatar || '/placeholder.svg'}" alt="">
+                        <div class="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors" 
+                             onclick="showUserInfo('${ticket.user.name}', '${ticket.user.discriminator}')">
+                            <img class="h-10 w-10 rounded-full border-2 border-indigo-200 shadow-sm hover:scale-110 transition-transform" 
+                                 src="${ticket.user.avatar || '/placeholder.svg'}" alt="" 
+                                 onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
                             <div>
-                                <div class="text-sm font-bold text-gray-900">${ticket.user.name}</div>
+                                <div class="text-sm font-bold text-gray-900 hover:text-indigo-600 transition-colors">${ticket.user.name}</div>
                                 <div class="text-sm text-gray-500">${ticket.user.discriminator}</div>
                             </div>
                         </div>
                     </td>
                     <td class="px-6 py-4">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getCategoryColor(ticket.category)}">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getCategoryColor(ticket.category)} hover:scale-105 transition-transform cursor-pointer" 
+                              onclick="filterByCategory('${ticket.category}')">
                             ${getCategoryIcon(ticket.category)} ${ticket.category}
                         </span>
                     </td>
                     <td class="px-6 py-4">
-                        <div class="flex items-center gap-2">
-                            <div class="w-3 h-3 rounded-full ${getPriorityColor(ticket.priority)}"></div>
+                        <div class="flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform" 
+                             onclick="filterByPriority('${ticket.priority}')">
+                            <div class="w-3 h-3 rounded-full ${getPriorityColor(ticket.priority)} animate-pulse"></div>
                             <span class="text-sm font-medium text-gray-900">${ticket.priority}</span>
                         </div>
                     </td>
                     <td class="px-6 py-4">
-                        <span class="text-sm font-mono font-bold text-gray-900">${ticket.duration}</span>
+                        <span class="text-sm font-mono font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded">${ticket.duration}</span>
                     </td>
                     <td class="px-6 py-4">
-                        <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors" 
+                             onclick="showOfficerInfo('${ticket.closedBy}')">
+                            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center hover:bg-indigo-200 transition-colors">
                                 <i data-lucide="user" class="h-4 w-4 text-indigo-600"></i>
                             </div>
                             <span class="text-sm font-medium text-gray-900">${ticket.closedBy}</span>
                         </div>
                     </td>
                     <td class="px-6 py-4">
-                        <div class="text-sm font-medium text-gray-900">${formatDate(ticket.closedAt)}</div>
-                        <div class="text-sm text-gray-500">${formatTime(ticket.closedAt)}</div>
+                        <div class="cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors" 
+                             onclick="showDateInfo('${ticket.closedAt}')">
+                            <div class="text-sm font-medium text-gray-900">${formatDate(ticket.closedAt)}</div>
+                            <div class="text-sm text-gray-500">${formatTime(ticket.closedAt)}</div>
+                        </div>
                     </td>
                     <td class="px-6 py-4">
-                        <div class="flex items-center gap-1">
+                        <div class="flex items-center gap-1 cursor-pointer hover:scale-105 transition-transform" 
+                             onclick="showRatingInfo(${ticket.satisfaction})">
                             ${Array.from({length: 5}, (_, i) => `
-                                <i data-lucide="star" class="h-4 w-4 ${i < ticket.satisfaction ? 'text-yellow-400 fill-current' : 'text-gray-300'}"></i>
+                                <i data-lucide="star" class="h-4 w-4 ${i < ticket.satisfaction ? 'text-yellow-400 fill-current' : 'text-gray-300'} hover:scale-110 transition-transform"></i>
                             `).join('')}
                             <span class="ml-2 text-sm font-medium text-gray-600">${ticket.satisfaction}/5</span>
                         </div>
                     </td>
                     <td class="px-6 py-4">
                         <button onclick="showTicketMessages('${ticket.id}')" 
-                                class="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg">
+                                class="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg transform hover:-translate-y-1">
                             <i data-lucide="eye" class="h-4 w-4 inline mr-1"></i>
                             Ver Detalhes
                         </button>
@@ -453,6 +527,147 @@
             lucide.createIcons();
         }
 
+        // Funções interativas
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification(`ID ${text} copiado!`, 'success');
+            });
+        }
+
+        function showUserInfo(name, discriminator) {
+            showNotification(`Usuário: ${name}${discriminator}`, 'info');
+        }
+
+        function showOfficerInfo(officer) {
+            showNotification(`Oficial responsável: ${officer}`, 'info');
+        }
+
+        function showDateInfo(date) {
+            const dateObj = new Date(date);
+            const timeAgo = getTimeAgo(dateObj);
+            showNotification(`Fechado ${timeAgo}`, 'info');
+        }
+
+        function showRatingInfo(rating) {
+            const messages = {
+                1: 'Muito insatisfeito',
+                2: 'Insatisfeito', 
+                3: 'Neutro',
+                4: 'Satisfeito',
+                5: 'Muito satisfeito'
+            };
+            showNotification(`Avaliação: ${rating}/5 - ${messages[rating]}`, 'info');
+        }
+
+        function filterByCategory(category) {
+            document.getElementById('categoryFilter').value = category;
+            applyFilters();
+        }
+
+        function filterByPriority(priority) {
+            document.getElementById('priorityFilter').value = priority;
+            applyFilters();
+        }
+
+        function clearFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('categoryFilter').value = 'all';
+            document.getElementById('priorityFilter').value = 'all';
+            applyFilters();
+        }
+
+        // Animação de contador
+        function animateCounter(elementId, targetValue) {
+            const element = document.getElementById(elementId);
+            const currentValue = parseInt(element.textContent) || 0;
+            const increment = targetValue > currentValue ? 1 : -1;
+            const duration = 1000;
+            const steps = Math.abs(targetValue - currentValue);
+            
+            if (steps === 0) return;
+            
+            const stepDuration = duration / steps;
+            let current = currentValue;
+            
+            const timer = setInterval(() => {
+                current += increment;
+                element.textContent = current.toLocaleString();
+                
+                if (current === targetValue) {
+                    clearInterval(timer);
+                }
+            }, stepDuration);
+        }
+
+        // Sistema de notificações
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform translate-x-full transition-transform duration-300 ${getNotificationColor(type)}`;
+            notification.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i data-lucide="${getNotificationIcon(type)}" class="h-5 w-5"></i>
+                    <span class="font-medium">${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        function getNotificationColor(type) {
+            const colors = {
+                success: 'bg-green-500 text-white',
+                error: 'bg-red-500 text-white',
+                info: 'bg-blue-500 text-white',
+                warning: 'bg-yellow-500 text-white'
+            };
+            return colors[type] || colors.info;
+        }
+
+        function getNotificationIcon(type) {
+            const icons = {
+                success: 'check-circle',
+                error: 'alert-circle',
+                info: 'info',
+                warning: 'alert-triangle'
+            };
+            return icons[type] || icons.info;
+        }
+
+        function getTimeAgo(date) {
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            
+            if (diffInSeconds < 60) return 'há poucos segundos';
+            if (diffInSeconds < 3600) return `há ${Math.floor(diffInSeconds / 60)} minutos`;
+            if (diffInSeconds < 86400) return `há ${Math.floor(diffInSeconds / 3600)} horas`;
+            return `há ${Math.floor(diffInSeconds / 86400)} dias`;
+        }
+
+        function showLoadingState() {
+            const tbody = document.getElementById('ticketsTableBody');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="px-6 py-12 text-center">
+                        <div class="loading-spinner mx-auto mb-4"></div>
+                        <p class="text-gray-500 font-medium">Carregando tickets...</p>
+                        <div class="mt-2 text-sm text-gray-400">Aguarde um momento</div>
+                    </td>
+                </tr>
+            `;
+        }
+
         function renderPagination() {
             const totalPages = Math.ceil(filteredTickets.length / ticketsPerPage);
             const paginationInfo = document.getElementById('paginationInfo');
@@ -461,7 +676,9 @@
             const startItem = (currentPage - 1) * ticketsPerPage + 1;
             const endItem = Math.min(currentPage * ticketsPerPage, filteredTickets.length);
             
-            paginationInfo.textContent = `Mostrando ${startItem}-${endItem} de ${filteredTickets.length} tickets`;
+            paginationInfo.innerHTML = `
+                Mostrando <span class="font-bold">${startItem}-${endItem}</span> de <span class="font-bold">${filteredTickets.length}</span> tickets
+            `;
             
             if (totalPages <= 1) {
                 paginationControls.innerHTML = '';
@@ -473,7 +690,7 @@
             // Botão Anterior
             paginationHTML += `
                 <button onclick="changePage(${currentPage - 1})" 
-                        class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}"
+                        class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}"
                         ${currentPage === 1 ? 'disabled' : ''}>
                     <i data-lucide="chevron-left" class="h-4 w-4"></i>
                 </button>
@@ -491,7 +708,7 @@
             // Primeira página
             if (startPage > 1) {
                 paginationHTML += `
-                    <button onclick="changePage(1)" class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <button onclick="changePage(1)" class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 hover:scale-105 transition-all">
                         1
                     </button>
                 `;
@@ -504,7 +721,7 @@
             for (let i = startPage; i <= endPage; i++) {
                 paginationHTML += `
                     <button onclick="changePage(${i})" 
-                            class="pagination-btn px-3 py-2 rounded-lg border text-sm font-medium ${i === currentPage ? 'active border-indigo-500' : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'}">
+                            class="pagination-btn px-3 py-2 rounded-lg border text-sm font-medium transition-all hover:scale-105 ${i === currentPage ? 'active border-indigo-500' : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'}">
                         ${i}
                     </button>
                 `;
@@ -516,7 +733,7 @@
                     paginationHTML += `<span class="px-2 text-gray-500">...</span>`;
                 }
                 paginationHTML += `
-                    <button onclick="changePage(${totalPages})" class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <button onclick="changePage(${totalPages})" class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 hover:scale-105 transition-all">
                         ${totalPages}
                     </button>
                 `;
@@ -525,7 +742,7 @@
             // Botão Próxima
             paginationHTML += `
                 <button onclick="changePage(${currentPage + 1})" 
-                        class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}"
+                        class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}"
                         ${currentPage === totalPages ? 'disabled' : ''}>
                     <i data-lucide="chevron-right" class="h-4 w-4"></i>
                 </button>
@@ -548,6 +765,8 @@
                 behavior: 'smooth',
                 block: 'start'
             });
+            
+            showNotification(`Página ${page} carregada`, 'info');
         }
 
         function getCategoryColor(category) {
@@ -595,12 +814,17 @@
 
         async function showTicketMessages(ticketId) {
             try {
+                showNotification('Carregando conversa...', 'info');
+                
                 const ticket = allTickets.find(t => t.id === ticketId);
                 const response = await fetch(`/api/tickets/${ticketId}/messages`);
+                
+                if (!response.ok) throw new Error('Erro ao carregar mensagens');
+                
                 const messages = await response.json();
 
                 document.getElementById('modalTitle').textContent = `Histórico do Ticket ${ticketId}`;
-                document.getElementById('modalSubtitle').textContent = `Conversa entre ${ticket.user.name} e a equipe de suporte`;
+                document.getElementById('modalSubtitle').textContent = `Conversa entre ${ticket.user.name} e a equipe de suporte • ${messages.length} mensagens`;
 
                 const modalContent = document.getElementById('modalContent');
                 
@@ -617,36 +841,47 @@
                 } else {
                     modalContent.innerHTML = `
                         <div class="space-y-6">
-                            ${messages.map(message => `
-                                <div class="flex gap-4 ${message.author.isStaff ? 'flex-row' : 'flex-row-reverse'}">
-                                    <img class="h-10 w-10 rounded-full border-2 ${message.author.isStaff ? 'border-indigo-200' : 'border-gray-200'}" 
-                                         src="${message.author.avatar || '/placeholder.svg'}" alt="">
+                            ${messages.map((message, index) => `
+                                <div class="flex gap-4 ${message.author.isStaff ? 'flex-row' : 'flex-row-reverse'} animate-fade-in" style="animation-delay: ${index * 0.1}s">
+                                    <img class="h-10 w-10 rounded-full border-2 ${message.author.isStaff ? 'border-indigo-200' : 'border-gray-200'} hover:scale-110 transition-transform cursor-pointer" 
+                                         src="${message.author.avatar || '/placeholder.svg'}" alt=""
+                                         onclick="showNotification('${message.author.name}', 'info')"
+                                         onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
                                     
                                     <div class="flex-1 max-w-[75%] ${message.author.isStaff ? '' : 'text-right'}">
                                         <div class="flex items-center gap-2 mb-2 ${message.author.isStaff ? '' : 'justify-end'}">
-                                            <span class="text-sm font-bold ${message.author.isStaff ? 'text-indigo-600' : 'text-gray-900'}">
+                                            <span class="text-sm font-bold ${message.author.isStaff ? 'text-indigo-600' : 'text-gray-900'} cursor-pointer hover:underline" 
+                                                  onclick="showNotification('${message.author.name}', 'info')">
                                                 ${message.author.name}
                                                 ${message.author.isStaff ? '<span class="ml-2 px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded-full">Staff</span>' : ''}
                                             </span>
-                                            <span class="text-xs text-gray-500">${formatMessageTime(message.timestamp)}</span>
+                                            <span class="text-xs text-gray-500 cursor-pointer hover:text-gray-700" 
+                                                  onclick="showNotification('${formatMessageTime(message.timestamp)}', 'info')">${formatMessageTime(message.timestamp)}</span>
                                         </div>
                                         
-                                        <div class="p-4 rounded-2xl shadow-sm ${message.author.isStaff ? 'bg-indigo-50 border border-indigo-100' : 'bg-gray-50 border border-gray-100'}">
-                                            <p class="text-sm leading-relaxed text-gray-800">${message.content}</p>
+                                        <div class="p-4 rounded-2xl shadow-sm ${message.author.isStaff ? 'bg-indigo-50 border border-indigo-100 hover:bg-indigo-100' : 'bg-gray-50 border border-gray-100 hover:bg-gray-100'} transition-colors cursor-pointer group">
+                                            <p class="text-sm leading-relaxed text-gray-800 select-text">${message.content}</p>
                                             
                                             ${message.attachments && message.attachments.length > 0 ? `
                                                 <div class="mt-3 space-y-2">
                                                     ${message.attachments.map(att => `
-                                                        <div class="flex items-center gap-2 p-3 bg-white rounded-lg border">
+                                                        <div class="flex items-center gap-2 p-3 bg-white rounded-lg border hover:border-indigo-200 transition-colors cursor-pointer" 
+                                                             onclick="showNotification('Anexo: ${att.name}', 'info')">
                                                             <i data-lucide="${att.type === 'image' ? 'image' : 'paperclip'}" class="h-4 w-4 text-gray-500"></i>
                                                             ${att.type === 'image' ? 
-                                                                `<img src="${att.url}" alt="${att.name}" class="max-w-xs rounded border">` :
-                                                                `<span class="text-sm font-medium">${att.name}</span>`
+                                                                `<img src="${att.url}" alt="${att.name}" class="max-w-xs rounded border hover:scale-105 transition-transform">` :
+                                                                `<span class="text-sm font-medium hover:text-indigo-600 transition-colors">${att.name}</span>`
                                                             }
                                                         </div>
                                                     `).join('')}
                                                 </div>
                                             ` : ''}
+                                            
+                                            <div class="opacity-0 group-hover:opacity-100 transition-opacity mt-2">
+                                                <button onclick="copyToClipboard('${message.content}')" class="text-xs text-gray-400 hover:text-gray-600">
+                                                    <i data-lucide="copy" class="h-3 w-3 inline mr-1"></i>Copiar
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -657,17 +892,27 @@
                             <div class="flex items-center justify-between text-sm">
                                 <div class="text-gray-700">
                                     <span class="font-bold">${messages.length}</span> mensagem(s) • 
-                                    Duração: <span class="font-bold">${ticket.duration}</span>
+                                    Duração: <span class="font-bold">${ticket.duration}</span> •
+                                    Criado: <span class="font-bold">${formatDate(ticket.createdAt)}</span>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <span class="font-medium text-gray-700">Satisfação:</span>
-                                    <div class="flex gap-1">
+                                    <div class="flex gap-1 cursor-pointer" onclick="showRatingInfo(${ticket.satisfaction})">
                                         ${Array.from({length: 5}, (_, i) => `
-                                            <i data-lucide="star" class="h-4 w-4 ${i < ticket.satisfaction ? 'text-yellow-400 fill-current' : 'text-gray-300'}"></i>
+                                            <i data-lucide="star" class="h-4 w-4 ${i < ticket.satisfaction ? 'text-yellow-400 fill-current' : 'text-gray-300'} hover:scale-110 transition-transform"></i>
                                         `).join('')}
                                     </div>
                                     <span class="font-bold text-gray-700">${ticket.satisfaction}/5</span>
                                 </div>
+                            </div>
+                            
+                            <div class="mt-4 flex gap-2">
+                                <button onclick="copyConversation('${ticketId}')" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors">
+                                    <i data-lucide="copy" class="h-3 w-3 inline mr-1"></i>Copiar Conversa
+                                </button>
+                                <button onclick="exportConversation('${ticketId}')" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors">
+                                    <i data-lucide="download" class="h-3 w-3 inline mr-1"></i>Exportar
+                                </button>
                             </div>
                         </div>
                     `;
@@ -675,10 +920,29 @@
 
                 document.getElementById('messageModal').classList.remove('hidden');
                 lucide.createIcons();
+                
+                showNotification('Conversa carregada!', 'success');
             } catch (error) {
                 console.error('Erro ao carregar mensagens:', error);
-                alert('Erro ao carregar histórico de mensagens');
+                showNotification('Erro ao carregar conversa', 'error');
             }
+        }
+
+        function copyConversation(ticketId) {
+            const ticket = allTickets.find(t => t.id === ticketId);
+            let conversationText = `Ticket ${ticketId} - ${ticket.category}\n`;
+            conversationText += `Usuário: ${ticket.user.name}\n`;
+            conversationText += `Fechado por: ${ticket.closedBy}\n`;
+            conversationText += `Duração: ${ticket.duration}\n\n`;
+            
+            // Aqui você adicionaria as mensagens reais
+            conversationText += "Conversa completa disponível no sistema.";
+            
+            copyToClipboard(conversationText);
+        }
+
+        function exportConversation(ticketId) {
+            showNotification('Funcionalidade de exportação em desenvolvimento', 'info');
         }
 
         function formatMessageTime(timestamp) {
@@ -692,9 +956,11 @@
 
         function closeModal() {
             document.getElementById('messageModal').classList.add('hidden');
+            showNotification('Modal fechado', 'info');
         }
 
         function refreshData() {
+            showNotification('Atualizando dados...', 'info');
             loadStats();
             loadTickets();
         }
@@ -708,9 +974,9 @@
                             <i data-lucide="alert-triangle" class="h-16 w-16 mx-auto opacity-50"></i>
                         </div>
                         <p class="text-red-500 font-medium text-lg">Erro ao carregar tickets</p>
-                        <p class="text-gray-400 text-sm mt-2">Tente atualizar a página</p>
-                        <button onclick="refreshData()" class="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                            Tentar Novamente
+                        <p class="text-gray-400 text-sm mt-2">Verifique sua conexão e tente novamente</p>
+                        <button onclick="refreshData()" class="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors hover:scale-105">
+                            <i data-lucide="refresh-cw" class="h-4 w-4 inline mr-1"></i>Tentar Novamente
                         </button>
                     </td>
                 </tr>
@@ -725,12 +991,23 @@
             }
         });
 
-        // Atalhos de teclado
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeModal();
+        // Adicionar CSS para animações
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fade-in {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
             }
-        });
+            
+            .animate-fade-in {
+                animation: fade-in 0.3s ease-out forwards;
+            }
+            
+            .select-text {
+                user-select: text;
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
