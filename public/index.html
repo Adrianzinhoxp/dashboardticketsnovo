@@ -29,7 +29,7 @@
             transition: all 0.3s ease;
         }
         
-        .pagination-btn:hover {
+        .pagination-btn:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
@@ -80,11 +80,60 @@
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-fade-in {
+            animation: fade-in 0.3s ease-out forwards;
+        }
+        
+        .select-text {
+            user-select: text;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .notification.error {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .notification.info {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .notification.warning {
+            background-color: #f59e0b;
+            color: white;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
     <div id="app">
-        <!-- Header Melhorado -->
+         Header Melhorado 
         <header class="bg-white shadow-xl border-b-4 border-indigo-500">
             <div class="container mx-auto px-6 py-6">
                 <div class="flex items-center justify-between">
@@ -98,7 +147,7 @@
                             <h1 class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                                 Dashboard de Tickets
                             </h1>
-                            <p class="text-gray-600 font-medium">Sistema de Gerenciamento Avançado • Polícia Civil</p>
+                            <p class="text-gray-600 font-medium">Departamento de policia Oasis</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-4">
@@ -117,7 +166,7 @@
             </div>
         </header>
 
-        <!-- Stats Cards Melhorados -->
+         Stats Cards Melhorados 
         <div class="container mx-auto px-6 py-8">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div class="stat-card bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-xl p-6 hover-scale">
@@ -173,7 +222,7 @@
                 </div>
             </div>
 
-            <!-- Filtros Melhorados -->
+             Filtros Melhorados 
             <div class="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
                 <h3 class="text-xl font-bold mb-6 flex items-center gap-3 text-gray-800">
                     <div class="bg-indigo-100 p-2 rounded-lg">
@@ -203,7 +252,7 @@
                 </div>
             </div>
 
-            <!-- Tabela de Tickets Melhorada -->
+             Tabela de Tickets Melhorada 
             <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
                 <div class="bg-gradient-to-r from-indigo-500 to-purple-600 p-6 text-white">
                     <div class="flex items-center justify-between">
@@ -243,14 +292,14 @@
                     </table>
                 </div>
                 
-                <!-- Paginação Moderna -->
+                 Paginação Moderna 
                 <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
                     <div class="flex items-center justify-between">
                         <div class="text-sm text-gray-700 font-medium" id="paginationInfo">
                             Carregando...
                         </div>
                         <div class="flex items-center gap-2" id="paginationControls">
-                            <!-- Controles de paginação serão inseridos aqui -->
+                             Controles de paginação serão inseridos aqui 
                         </div>
                     </div>
                 </div>
@@ -258,7 +307,7 @@
         </div>
     </div>
 
-    <!-- Modal Melhorado -->
+     Modal Melhorado 
     <div id="messageModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 backdrop-blur-sm">
         <div class="flex items-center justify-center min-h-screen p-4">
             <div class="bg-white rounded-2xl max-w-5xl w-full max-h-[85vh] overflow-hidden shadow-2xl border border-gray-200 fade-in">
@@ -280,7 +329,7 @@
                 </div>
                 
                 <div id="modalContent" class="p-6 overflow-y-auto max-h-96">
-                    <!-- Mensagens serão inseridas aqui -->
+                     Mensagens serão inseridas aqui 
                 </div>
             </div>
         </div>
@@ -295,6 +344,7 @@
 
         // Inicializar
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Inicializando dashboard...');
             lucide.createIcons();
             loadStats();
             loadTickets();
@@ -336,10 +386,12 @@
 
         async function loadStats() {
             try {
+                console.log('📊 Carregando estatísticas...');
                 const response = await fetch('/api/tickets/stats');
-                if (!response.ok) throw new Error('Erro na resposta');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
                 const stats = await response.json();
+                console.log('✅ Estatísticas carregadas:', stats);
                 
                 // Animação dos números
                 animateCounter('totalClosed', stats.totalClosed);
@@ -347,10 +399,9 @@
                 document.getElementById('avgTime').textContent = stats.avgResolutionTime;
                 document.getElementById('satisfaction').textContent = stats.satisfactionRate + '/5';
                 
-                // Adicionar efeito de sucesso
                 showNotification('Estatísticas atualizadas!', 'success');
             } catch (error) {
-                console.error('Erro ao carregar estatísticas:', error);
+                console.error('❌ Erro ao carregar estatísticas:', error);
                 showNotification('Erro ao carregar estatísticas', 'error');
             }
         }
@@ -360,20 +411,23 @@
             
             try {
                 isLoading = true;
+                console.log('🎫 Carregando tickets...');
                 showLoadingState();
                 
                 const response = await fetch('/api/tickets/closed');
-                if (!response.ok) throw new Error('Erro na resposta');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
                 allTickets = await response.json();
                 filteredTickets = [...allTickets];
+                
+                console.log(`✅ ${allTickets.length} tickets carregados`);
                 
                 renderTickets();
                 renderPagination();
                 
                 showNotification(`${allTickets.length} tickets carregados!`, 'success');
             } catch (error) {
-                console.error('Erro ao carregar tickets:', error);
+                console.error('❌ Erro ao carregar tickets:', error);
                 showError();
                 showNotification('Erro ao carregar tickets', 'error');
             } finally {
@@ -416,7 +470,6 @@
             renderTickets();
             renderPagination();
             
-            // Feedback visual
             showNotification(`${filteredTickets.length} tickets encontrados`, 'info');
         }
 
@@ -465,7 +518,7 @@
                         <div class="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors" 
                              onclick="showUserInfo('${ticket.user.name}', '${ticket.user.discriminator}')">
                             <img class="h-10 w-10 rounded-full border-2 border-indigo-200 shadow-sm hover:scale-110 transition-transform" 
-                                 src="${ticket.user.avatar || '/placeholder.svg'}" alt="" 
+                                 src="${ticket.user.avatar}" alt="" 
                                  onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
                             <div>
                                 <div class="text-sm font-bold text-gray-900 hover:text-indigo-600 transition-colors">${ticket.user.name}</div>
@@ -531,6 +584,8 @@
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
                 showNotification(`ID ${text} copiado!`, 'success');
+            }).catch(() => {
+                showNotification('Erro ao copiar', 'error');
             });
         }
 
@@ -602,7 +657,7 @@
         // Sistema de notificações
         function showNotification(message, type = 'info') {
             const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform translate-x-full transition-transform duration-300 ${getNotificationColor(type)}`;
+            notification.className = `notification ${type}`;
             notification.innerHTML = `
                 <div class="flex items-center gap-2">
                     <i data-lucide="${getNotificationIcon(type)}" class="h-5 w-5"></i>
@@ -614,25 +669,17 @@
             lucide.createIcons();
             
             setTimeout(() => {
-                notification.classList.remove('translate-x-full');
+                notification.classList.add('show');
             }, 100);
             
             setTimeout(() => {
-                notification.classList.add('translate-x-full');
+                notification.classList.remove('show');
                 setTimeout(() => {
-                    document.body.removeChild(notification);
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
                 }, 300);
             }, 3000);
-        }
-
-        function getNotificationColor(type) {
-            const colors = {
-                success: 'bg-green-500 text-white',
-                error: 'bg-red-500 text-white',
-                info: 'bg-blue-500 text-white',
-                warning: 'bg-yellow-500 text-white'
-            };
-            return colors[type] || colors.info;
         }
 
         function getNotificationIcon(type) {
@@ -814,14 +861,19 @@
 
         async function showTicketMessages(ticketId) {
             try {
+                console.log(`🔍 Carregando conversa do ticket ${ticketId}...`);
                 showNotification('Carregando conversa...', 'info');
                 
                 const ticket = allTickets.find(t => t.id === ticketId);
-                const response = await fetch(`/api/tickets/${ticketId}/messages`);
+                if (!ticket) {
+                    throw new Error('Ticket não encontrado');
+                }
                 
-                if (!response.ok) throw new Error('Erro ao carregar mensagens');
+                const response = await fetch(`/api/tickets/${ticketId}/messages`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
                 const messages = await response.json();
+                console.log(`✅ ${messages.length} mensagens carregadas para ${ticketId}`);
 
                 document.getElementById('modalTitle').textContent = `Histórico do Ticket ${ticketId}`;
                 document.getElementById('modalSubtitle').textContent = `Conversa entre ${ticket.user.name} e a equipe de suporte • ${messages.length} mensagens`;
@@ -844,7 +896,8 @@
                             ${messages.map((message, index) => `
                                 <div class="flex gap-4 ${message.author.isStaff ? 'flex-row' : 'flex-row-reverse'} animate-fade-in" style="animation-delay: ${index * 0.1}s">
                                     <img class="h-10 w-10 rounded-full border-2 ${message.author.isStaff ? 'border-indigo-200' : 'border-gray-200'} hover:scale-110 transition-transform cursor-pointer" 
-                                         src="${message.author.avatar || '/placeholder.svg'}" alt=""
+                                         src="${message.author.avatar}" alt=""
+                                         onclick="showNotification('${
                                          onclick="showNotification('${message.author.name}', 'info')"
                                          onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
                                     
@@ -878,7 +931,7 @@
                                             ` : ''}
                                             
                                             <div class="opacity-0 group-hover:opacity-100 transition-opacity mt-2">
-                                                <button onclick="copyToClipboard('${message.content}')" class="text-xs text-gray-400 hover:text-gray-600">
+                                                <button onclick="copyToClipboard('${message.content.replace(/'/g, "\\'")}'); event.stopPropagation();" class="text-xs text-gray-400 hover:text-gray-600">
                                                     <i data-lucide="copy" class="h-3 w-3 inline mr-1"></i>Copiar
                                                 </button>
                                             </div>
@@ -923,7 +976,7 @@
                 
                 showNotification('Conversa carregada!', 'success');
             } catch (error) {
-                console.error('Erro ao carregar mensagens:', error);
+                console.error('❌ Erro ao carregar mensagens:', error);
                 showNotification('Erro ao carregar conversa', 'error');
             }
         }
@@ -935,7 +988,6 @@
             conversationText += `Fechado por: ${ticket.closedBy}\n`;
             conversationText += `Duração: ${ticket.duration}\n\n`;
             
-            // Aqui você adicionaria as mensagens reais
             conversationText += "Conversa completa disponível no sistema.";
             
             copyToClipboard(conversationText);
@@ -990,24 +1042,6 @@
                 closeModal();
             }
         });
-
-        // Adicionar CSS para animações
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes fade-in {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            
-            .animate-fade-in {
-                animation: fade-in 0.3s ease-out forwards;
-            }
-            
-            .select-text {
-                user-select: text;
-            }
-        `;
-        document.head.appendChild(style);
     </script>
 </body>
 </html>
