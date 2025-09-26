@@ -3,6 +3,7 @@ const cors = require("cors")
 const path = require("path")
 const helmet = require("helmet")
 const compression = require("compression")
+const fs = require("fs")
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -26,7 +27,27 @@ app.use(
 app.use(compression())
 app.use(cors())
 app.use(express.json())
+
+// Servir arquivos estáticos com fallback
 app.use(express.static(path.join(__dirname, "public")))
+
+// Middleware para verificar se os arquivos existem
+app.use((req, res, next) => {
+  if (req.path === "/" || req.path === "/index.html") {
+    const indexPath = path.join(__dirname, "public", "index.html")
+    if (!fs.existsSync(indexPath)) {
+      console.error("❌ Arquivo index.html não encontrado em:", indexPath)
+      return res.status(500).send(`
+        <h1>Erro de Configuração</h1>
+        <p>Arquivo index.html não encontrado.</p>
+        <p>Caminho esperado: ${indexPath}</p>
+        <p>Arquivos disponíveis:</p>
+        <pre>${JSON.stringify(fs.readdirSync(__dirname), null, 2)}</pre>
+      `)
+    }
+  }
+  next()
+})
 
 // Dados simulados para demonstração
 const ticketsData = [
@@ -218,9 +239,147 @@ app.get("/api/stats", (req, res) => {
   }
 })
 
-// Rota principal
+// Rota principal com fallback
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"))
+  const indexPath = path.join(__dirname, "public", "index.html")
+
+  // Verificar se o arquivo existe
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath)
+  } else {
+    // Fallback: servir HTML inline
+    res.send(`
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Tickets Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #1a1a2e; color: white; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .logo { width: 60px; height: 60px; border-radius: 12px; margin-bottom: 10px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: #667eea; }
+        .table-container { background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
+        .table-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        th { background: rgba(102,126,234,0.2); }
+        .loading { text-align: center; padding: 50px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://media.discordapp.net/attachments/1414044312890769448/1414399293476966430/dacacacscs.png" alt="Logo" class="logo">
+            <h1>Discord Tickets Dashboard</h1>
+            <p>Sistema de Gerenciamento de Tickets</p>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalTickets">0</div>
+                <div>Total de Tickets</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="openTickets">0</div>
+                <div>Tickets Abertos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="closedTickets">0</div>
+                <div>Tickets Fechados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="pendingTickets">0</div>
+                <div>Tickets Pendentes</div>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <div class="table-header">
+                <h2>Lista de Tickets</h2>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuário</th>
+                        <th>Tipo</th>
+                        <th>Status</th>
+                        <th>Criado em</th>
+                    </tr>
+                </thead>
+                <tbody id="ticketsTable">
+                    <tr><td colspan="5" class="loading">Carregando tickets...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        // Carregar dados
+        async function loadData() {
+            try {
+                const response = await fetch('/api/tickets')
+                const data = await response.json()
+                
+                if (data.success) {
+                    updateStats(data.tickets)
+                    renderTickets(data.tickets.slice(0, 10))
+                }
+            } catch (error) {
+                console.error('Erro:', error)
+                document.getElementById('ticketsTable').innerHTML = 
+                    '<tr><td colspan="5" style="text-align: center; color: #f56565;">Erro ao carregar dados</td></tr>'
+            }
+        }
+        
+        function updateStats(tickets) {
+            const stats = {
+                total: tickets.length,
+                open: tickets.filter(t => t.status === 'open').length,
+                closed: tickets.filter(t => t.status === 'closed').length,
+                pending: tickets.filter(t => t.status === 'pending').length
+            }
+            
+            document.getElementById('totalTickets').textContent = stats.total
+            document.getElementById('openTickets').textContent = stats.open
+            document.getElementById('closedTickets').textContent = stats.closed
+            document.getElementById('pendingTickets').textContent = stats.pending
+        }
+        
+        function renderTickets(tickets) {
+            const tbody = document.getElementById('ticketsTable')
+            
+            if (tickets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum ticket encontrado</td></tr>'
+                return
+            }
+            
+            tbody.innerHTML = tickets.map(ticket => \`
+                <tr>
+                    <td>#\${ticket.id}</td>
+                    <td>\${ticket.username}</td>
+                    <td>\${ticket.type}</td>
+                    <td>\${ticket.status}</td>
+                    <td>\${new Date(ticket.createdAt).toLocaleDateString('pt-BR')}</td>
+                </tr>
+            \`).join('')
+        }
+        
+        // Carregar dados ao inicializar
+        document.addEventListener('DOMContentLoaded', loadData)
+        
+        // Auto-refresh a cada 30 segundos
+        setInterval(loadData, 30000)
+    </script>
+</body>
+</html>
+    `)
+  }
 })
 
 // Health check para o Render
