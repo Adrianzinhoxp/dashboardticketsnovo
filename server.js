@@ -16,7 +16,7 @@ app.use(
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
         scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://unpkg.com"],
-        imgSrc: ["'self'", "data:", "https:", "blob:", "https://media.discordapp.net", "https://cdn.discordapp.com"],
+        imgSrc: ["'self'", "data:", "https://", "blob:", "https://media.discordapp.net", "https://cdn.discordapp.com"],
         connectSrc: ["'self'"],
         fontSrc: ["'self'", "https:", "data:", "https://fonts.gstatic.com"],
       },
@@ -128,98 +128,165 @@ app.get("/api/tickets/:ticketId/messages", (req, res) => {
     return res.status(404).json({ error: "Ticket não encontrado" })
   }
 
-  // Gerar mensagens de exemplo baseadas na categoria
+  // Gerar conversas mais realistas e detalhadas
   const messages = []
-
-  // Mensagem inicial do usuário
-  let initialMessage = ""
-  switch (ticket.category) {
-    case "Up de Patente":
-      initialMessage =
-        "Olá! Gostaria de solicitar um up de patente. Estou há bastante tempo na corporação e acredito que mereço uma promoção."
-      break
-    case "Dúvidas":
-      initialMessage = "Tenho algumas dúvidas sobre o regulamento da corporação. Podem me ajudar?"
-      break
-    case "Corregedoria":
-      initialMessage = "Preciso reportar uma situação que presenciei. Como devo proceder?"
-      break
-    default:
-      initialMessage = "Olá! Preciso de ajuda com uma questão."
+  const messageTemplates = {
+    "Up de Patente": [
+      {
+        user: "Olá! Gostaria de solicitar um up de patente. Estou há bastante tempo na corporação e acredito que mereço uma promoção. Tenho me dedicado muito e seguido todas as regras.",
+        staff:
+          "Olá! Obrigado por entrar em contato. Vou analisar sua solicitação de promoção. Para isso, preciso que você me envie algumas informações: tempo de serviço, patente atual, e principais contribuições para a corporação.",
+        user2:
+          "Claro! Estou na corporação há 3 meses, atualmente sou Soldado, e tenho participado ativamente das operações. Sempre cumpro os horários e ajudo outros membros quando necessário.",
+        staff2:
+          "Perfeito! Vou verificar seu histórico no sistema. Suas informações estão corretas e seu comportamento tem sido exemplar. Após análise com a alta cúpula, sua promoção foi aprovada! Parabéns, agora você é Cabo. As alterações já foram aplicadas no sistema.",
+        user3:
+          "Muito obrigado! Fico muito feliz com a promoção. Continuarei me dedicando ainda mais para honrar essa nova patente. Vocês são uma equipe incrível! 🎉",
+      },
+      {
+        user: "Boa tarde! Venho solicitar respeitosamente um up de patente. Acredito ter cumprido todos os requisitos necessários.",
+        staff:
+          "Boa tarde! Vou verificar sua solicitação. Pode me informar há quanto tempo está na corporação e qual sua patente atual?",
+        user2:
+          "Estou há 2 meses e meio na corporação, sou Soldado atualmente. Tenho participado de todas as operações possíveis e sempre respeitei a hierarquia.",
+        staff2:
+          "Analisando seu perfil... Vejo que você tem um bom histórico de participação. Sua promoção foi aprovada! Agora você é Cabo. Continue assim!",
+        user3: "Excelente! Muito obrigado pela oportunidade. Prometo continuar dando o meu melhor! 💪",
+      },
+    ],
+    Dúvidas: [
+      {
+        user: "Olá! Tenho algumas dúvidas sobre o regulamento da corporação. Podem me ajudar?",
+        staff:
+          "Olá! Claro, ficarei feliz em esclarecer suas dúvidas. Qual ponto específico do regulamento você gostaria de saber mais?",
+        user2:
+          "Gostaria de saber sobre os horários de operação, como funciona o sistema de faltas, e quais são as punições por descumprimento de regras.",
+        staff2:
+          "Ótimas perguntas! Sobre os horários: temos operações diárias às 20h e 22h. Faltas são toleradas até 3 por mês, acima disso há advertência. As punições variam de advertência verbal até rebaixamento, dependendo da gravidade. Alguma dúvida específica sobre esses pontos?",
+        user3: "Perfeito! Esclareceu todas minhas dúvidas. Muito obrigado pela atenção e paciência! 😊",
+      },
+      {
+        user: "Oi! Sou novo na corporação e tenho dúvidas sobre como funciona o sistema de patentes.",
+        staff:
+          "Olá! Seja bem-vindo! O sistema de patentes funciona por tempo de serviço e desempenho. Começamos como Recruta, depois Soldado, Cabo, e assim por diante. Cada promoção tem requisitos específicos.",
+        user2:
+          "Entendi! E quanto tempo normalmente leva para subir de patente? Existe algum requisito especial além do tempo?",
+        staff2:
+          "Geralmente leva de 1-2 meses entre promoções, mas depende do seu desempenho, participação em operações, e comportamento. Não há requisitos especiais, apenas dedicação e respeito às regras!",
+        user3: "Muito obrigado pelas informações! Vou me esforçar ao máximo. Vocês são muito atenciosos! 👍",
+      },
+    ],
+    Corregedoria: [
+      {
+        user: "Preciso reportar uma situação que presenciei. Como devo proceder?",
+        staff:
+          "Olá! Obrigado por reportar. A corregedoria leva todas as denúncias a sério. Pode me dar mais detalhes sobre o ocorrido? Manteremos sigilo total sobre sua identidade.",
+        user2:
+          "Vi um membro da corporação agindo de forma inadequada durante uma operação, desrespeitando civis e não seguindo os protocolos estabelecidos. Tenho prints como evidência.",
+        staff2:
+          "Entendo a gravidade da situação. Por favor, envie as evidências que possui. Vou encaminhar imediatamente para a corregedoria interna. O caso será investigado com total seriedade e as medidas cabíveis serão tomadas.",
+        user3:
+          "Obrigado pela atenção. Enviei as evidências por DM. Espero que a situação seja resolvida adequadamente.",
+      },
+      {
+        user: "Gostaria de fazer uma denúncia anônima sobre comportamento inadequado de um superior.",
+        staff:
+          "Olá! Todas as denúncias são tratadas com máxima seriedade e sigilo. Pode relatar o que aconteceu? Sua identidade será protegida durante todo o processo.",
+        user2:
+          "Um superior tem abusado da autoridade, fazendo ameaças e criando um ambiente hostil. Outros membros também estão incomodados mas têm medo de falar.",
+        staff2:
+          "Essa é uma situação muito grave. Vou encaminhar imediatamente para a alta corregedoria. Será aberta uma investigação sigilosa. Obrigado por ter a coragem de reportar. Situações assim não são toleradas em nossa corporação.",
+        user3: "Agradeço pela seriedade no tratamento. Espero que a situação seja resolvida para o bem de todos.",
+      },
+    ],
   }
 
+  // Selecionar template baseado na categoria
+  const templates = messageTemplates[ticket.category] || messageTemplates["Dúvidas"]
+  const selectedTemplate = templates[Math.floor(Math.random() * templates.length)]
+
+  let messageId = 1
+  const baseTime = new Date(ticket.createdAt).getTime()
+
+  // Mensagem inicial do usuário
   messages.push({
-    id: "msg-1",
+    id: `msg-${messageId++}`,
     author: {
       name: ticket.user.name,
       avatar: ticket.user.avatar,
       isStaff: false,
     },
-    content: initialMessage,
-    timestamp: ticket.createdAt,
+    content: selectedTemplate.user,
+    timestamp: new Date(baseTime).toISOString(),
     attachments: [],
   })
 
   // Resposta do staff
-  let staffResponse = ""
-  switch (ticket.category) {
-    case "Up de Patente":
-      staffResponse = "Olá! Vou analisar sua solicitação de promoção. Pode me enviar seus dados e tempo de serviço?"
-      break
-    case "Dúvidas":
-      staffResponse =
-        "Olá! Ficarei feliz em esclarecer suas dúvidas. Qual ponto específico do regulamento você gostaria de saber?"
-      break
-    case "Corregedoria":
-      staffResponse =
-        "Olá! Obrigado por reportar. Vou encaminhar para a corregedoria. Pode me dar mais detalhes sobre o ocorrido?"
-      break
-    default:
-      staffResponse = "Olá! Como posso ajudá-lo hoje?"
-  }
-
   messages.push({
-    id: "msg-2",
+    id: `msg-${messageId++}`,
     author: {
       name: ticket.closedBy,
       avatar: "https://cdn.discordapp.com/embed/avatars/1.png",
       isStaff: true,
     },
-    content: staffResponse,
-    timestamp: new Date(new Date(ticket.createdAt).getTime() + 5 * 60 * 1000).toISOString(),
+    content: selectedTemplate.staff,
+    timestamp: new Date(baseTime + 5 * 60 * 1000).toISOString(),
     attachments: [],
   })
 
-  // Mensagem de resolução
-  let resolutionMessage = ""
-  switch (ticket.category) {
-    case "Up de Patente":
-      resolutionMessage =
-        "Após análise, sua promoção foi aprovada! Parabéns pelo novo cargo. As alterações já foram aplicadas."
-      break
-    case "Dúvidas":
-      resolutionMessage =
-        "Espero ter esclarecido todas suas dúvidas! Se precisar de mais alguma coisa, não hesite em abrir outro ticket."
-      break
-    case "Corregedoria":
-      resolutionMessage =
-        "O caso foi devidamente registrado e encaminhado para investigação. Obrigado pela colaboração."
-      break
-    default:
-      resolutionMessage = "Problema resolvido com sucesso! Obrigado por entrar em contato."
+  // Segunda mensagem do usuário (se existir)
+  if (selectedTemplate.user2) {
+    messages.push({
+      id: `msg-${messageId++}`,
+      author: {
+        name: ticket.user.name,
+        avatar: ticket.user.avatar,
+        isStaff: false,
+      },
+      content: selectedTemplate.user2,
+      timestamp: new Date(baseTime + 10 * 60 * 1000).toISOString(),
+      attachments:
+        ticket.category === "Corregedoria"
+          ? [
+              {
+                name: "evidencia.png",
+                url: "https://via.placeholder.com/300x200/667eea/ffffff?text=Evidência",
+                type: "image",
+              },
+            ]
+          : [],
+    })
   }
 
-  messages.push({
-    id: "msg-3",
-    author: {
-      name: ticket.closedBy,
-      avatar: "https://cdn.discordapp.com/embed/avatars/1.png",
-      isStaff: true,
-    },
-    content: resolutionMessage,
-    timestamp: new Date(new Date(ticket.closedAt).getTime() - 2 * 60 * 1000).toISOString(),
-    attachments: [],
-  })
+  // Segunda resposta do staff (se existir)
+  if (selectedTemplate.staff2) {
+    messages.push({
+      id: `msg-${messageId++}`,
+      author: {
+        name: ticket.closedBy,
+        avatar: "https://cdn.discordapp.com/embed/avatars/1.png",
+        isStaff: true,
+      },
+      content: selectedTemplate.staff2,
+      timestamp: new Date(baseTime + 20 * 60 * 1000).toISOString(),
+      attachments: [],
+    })
+  }
+
+  // Mensagem final do usuário (se existir)
+  if (selectedTemplate.user3) {
+    messages.push({
+      id: `msg-${messageId++}`,
+      author: {
+        name: ticket.user.name,
+        avatar: ticket.user.avatar,
+        isStaff: false,
+      },
+      content: selectedTemplate.user3,
+      timestamp: new Date(new Date(ticket.closedAt).getTime() - 2 * 60 * 1000).toISOString(),
+      attachments: [],
+    })
+  }
 
   res.json(messages)
 })
