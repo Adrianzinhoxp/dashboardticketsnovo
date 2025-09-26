@@ -15,7 +15,7 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://unpkg.com"],
         imgSrc: ["'self'", "data:", "https:", "blob:", "https://media.discordapp.net", "https://cdn.discordapp.com"],
         connectSrc: ["'self'"],
         fontSrc: ["'self'", "https:", "data:", "https://fonts.gstatic.com"],
@@ -28,366 +28,224 @@ app.use(compression())
 app.use(cors())
 app.use(express.json())
 
-// Servir arquivos estáticos com fallback
+// Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, "public")))
 
-// Middleware para verificar se os arquivos existem
-app.use((req, res, next) => {
-  if (req.path === "/" || req.path === "/index.html") {
-    const indexPath = path.join(__dirname, "public", "index.html")
-    if (!fs.existsSync(indexPath)) {
-      console.error("❌ Arquivo index.html não encontrado em:", indexPath)
-      return res.status(500).send(`
-        <h1>Erro de Configuração</h1>
-        <p>Arquivo index.html não encontrado.</p>
-        <p>Caminho esperado: ${indexPath}</p>
-        <p>Arquivos disponíveis:</p>
-        <pre>${JSON.stringify(fs.readdirSync(__dirname), null, 2)}</pre>
-      `)
-    }
+// Dados simulados com as 3 categorias
+const generateSampleTickets = () => {
+  const categories = ["Up de Patente", "Dúvidas", "Corregedoria"]
+  const priorities = ["Crítica", "Alta", "Média", "Baixa"]
+  const officers = ["Oficial Santos", "Oficial Lima", "Oficial Silva", "Oficial Costa", "Oficial Pereira"]
+  const users = [
+    { name: "João Silva", discriminator: "#1234" },
+    { name: "Maria Santos", discriminator: "#5678" },
+    { name: "Pedro Costa", discriminator: "#9012" },
+    { name: "Ana Oliveira", discriminator: "#3456" },
+    { name: "Carlos Lima", discriminator: "#7890" },
+    { name: "Fernanda Souza", discriminator: "#2345" },
+    { name: "Roberto Alves", discriminator: "#6789" },
+    { name: "Juliana Ferreira", discriminator: "#0123" },
+    { name: "Marcos Rodrigues", discriminator: "#4567" },
+    { name: "Patrícia Mendes", discriminator: "#8901" },
+  ]
+
+  const tickets = []
+
+  for (let i = 1; i <= 150; i++) {
+    const user = users[Math.floor(Math.random() * users.length)]
+    const category = categories[Math.floor(Math.random() * categories.length)]
+    const priority = priorities[Math.floor(Math.random() * priorities.length)]
+    const officer = officers[Math.floor(Math.random() * officers.length)]
+
+    const createdAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000) // Últimos 30 dias
+    const closedAt = new Date(createdAt.getTime() + Math.random() * 24 * 60 * 60 * 1000) // Até 24h depois
+
+    const duration = Math.floor((closedAt - createdAt) / (1000 * 60)) // em minutos
+    const hours = Math.floor(duration / 60)
+    const minutes = duration % 60
+
+    tickets.push({
+      id: `TK-${String(i).padStart(3, "0")}`,
+      user: {
+        name: user.name,
+        avatar: `https://cdn.discordapp.com/embed/avatars/${i % 6}.png`,
+        discriminator: user.discriminator,
+      },
+      category: category,
+      closedAt: closedAt.toISOString(),
+      duration: `${hours}h ${minutes}m`,
+      closedBy: officer,
+      priority: priority,
+      satisfaction: Math.floor(Math.random() * 2) + 4, // 4 ou 5 estrelas
+      channelId: `${1000000000000000000 + i}`,
+      createdAt: createdAt.toISOString(),
+    })
   }
-  next()
-})
 
-// Dados simulados para demonstração
-const ticketsData = [
-  {
-    id: "001",
-    username: "João Silva",
-    userId: "123456789",
-    userAvatar: "https://cdn.discordapp.com/embed/avatars/1.png",
-    type: "Up de Patente",
-    status: "closed",
-    priority: "high",
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    closedAt: new Date().toISOString(),
-    officerName: "Oficial Santos",
-    rating: 5,
-    messages: [
-      {
-        author: "João Silva",
-        content: "Olá, gostaria de solicitar um up de patente.",
-        timestamp: new Date(Date.now() - 86400000).toISOString(),
-        attachments: [],
-      },
-      {
-        author: "Oficial Santos",
-        content: "Olá! Vou analisar sua solicitação. Pode me enviar seus dados?",
-        timestamp: new Date(Date.now() - 86000000).toISOString(),
-        attachments: [],
-      },
-      {
-        author: "João Silva",
-        content: "Claro! Aqui estão meus dados: [dados]",
-        timestamp: new Date(Date.now() - 85000000).toISOString(),
-        attachments: [],
-      },
-      {
-        author: "Oficial Santos",
-        content: "Perfeito! Seu up foi aprovado. Parabéns pela promoção!",
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        attachments: [],
-      },
-    ],
-  },
-  {
-    id: "002",
-    username: "Maria Oliveira",
-    userId: "987654321",
-    userAvatar: "https://cdn.discordapp.com/embed/avatars/2.png",
-    type: "Dúvidas",
-    status: "open",
-    priority: "medium",
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    officerName: null,
-    rating: 0,
-    messages: [
-      {
-        author: "Maria Oliveira",
-        content: "Tenho algumas dúvidas sobre o regulamento.",
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        attachments: [],
-      },
-    ],
-  },
-  {
-    id: "003",
-    username: "Pedro Santos",
-    userId: "456789123",
-    userAvatar: "https://cdn.discordapp.com/embed/avatars/3.png",
-    type: "Up de Patente",
-    status: "pending",
-    priority: "low",
-    createdAt: new Date(Date.now() - 7200000).toISOString(),
-    officerName: "Oficial Lima",
-    rating: 0,
-    messages: [
-      {
-        author: "Pedro Santos",
-        content: "Solicito up de patente, por favor.",
-        timestamp: new Date(Date.now() - 7200000).toISOString(),
-        attachments: [],
-      },
-      {
-        author: "Oficial Lima",
-        content: "Recebido! Vou analisar sua solicitação.",
-        timestamp: new Date(Date.now() - 6000000).toISOString(),
-        attachments: [],
-      },
-    ],
-  },
-]
-
-// Gerar mais tickets para demonstrar a paginação
-for (let i = 4; i <= 50; i++) {
-  const types = ["Up de Patente", "Dúvidas"]
-  const statuses = ["open", "closed", "pending"]
-  const priorities = ["high", "medium", "low"]
-  const officers = ["Oficial Santos", "Oficial Lima", "Oficial Silva", null]
-
-  ticketsData.push({
-    id: String(i).padStart(3, "0"),
-    username: `Usuário ${i}`,
-    userId: `${100000000 + i}`,
-    userAvatar: `https://cdn.discordapp.com/embed/avatars/${i % 6}.png`,
-    type: types[i % types.length],
-    status: statuses[i % statuses.length],
-    priority: priorities[i % priorities.length],
-    createdAt: new Date(Date.now() - i * 3600000).toISOString(),
-    closedAt: statuses[i % statuses.length] === "closed" ? new Date(Date.now() - i * 1800000).toISOString() : null,
-    officerName: officers[i % officers.length],
-    rating: statuses[i % statuses.length] === "closed" ? Math.floor(Math.random() * 5) + 1 : 0,
-    messages: [
-      {
-        author: `Usuário ${i}`,
-        content: `Mensagem do ticket ${i}`,
-        timestamp: new Date(Date.now() - i * 3600000).toISOString(),
-        attachments: [],
-      },
-    ],
-  })
+  return tickets.sort((a, b) => new Date(b.closedAt) - new Date(a.closedAt))
 }
 
+const sampleTickets = generateSampleTickets()
+
 // Rotas da API
-app.get("/api/tickets", (req, res) => {
-  try {
-    // Ordenar por data de criação (mais recentes primeiro)
-    const sortedTickets = ticketsData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+app.get("/api/tickets/stats", (req, res) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
-    res.json({
-      success: true,
-      tickets: sortedTickets,
-      total: sortedTickets.length,
-    })
-  } catch (error) {
-    console.error("Erro ao buscar tickets:", error)
-    res.status(500).json({
-      success: false,
-      error: "Erro interno do servidor",
-    })
-  }
+  const todayTickets = sampleTickets.filter((ticket) => new Date(ticket.closedAt) >= today)
+
+  const totalDuration = sampleTickets.reduce((sum, ticket) => {
+    const duration = new Date(ticket.closedAt) - new Date(ticket.createdAt)
+    return sum + duration
+  }, 0)
+
+  const avgDuration = sampleTickets.length > 0 ? totalDuration / sampleTickets.length : 0
+  const avgHours = Math.floor(avgDuration / (1000 * 60 * 60))
+  const avgMinutes = Math.floor((avgDuration % (1000 * 60 * 60)) / (1000 * 60))
+
+  const avgSatisfaction =
+    sampleTickets.length > 0
+      ? sampleTickets.reduce((sum, ticket) => sum + (ticket.satisfaction || 0), 0) / sampleTickets.length
+      : 0
+
+  res.json({
+    totalClosed: sampleTickets.length,
+    todayClosed: todayTickets.length,
+    avgResolutionTime: `${avgHours}h ${avgMinutes}m`,
+    satisfactionRate: Math.round(avgSatisfaction * 10) / 10,
+  })
 })
 
-app.get("/api/tickets/:id", (req, res) => {
-  try {
-    const ticketId = req.params.id
-    const ticket = ticketsData.find((t) => t.id === ticketId)
-
-    if (!ticket) {
-      return res.status(404).json({
-        success: false,
-        error: "Ticket não encontrado",
-      })
-    }
-
-    res.json({
-      success: true,
-      ticket: ticket,
-    })
-  } catch (error) {
-    console.error("Erro ao buscar ticket:", error)
-    res.status(500).json({
-      success: false,
-      error: "Erro interno do servidor",
-    })
-  }
+app.get("/api/tickets/closed", (req, res) => {
+  res.json(sampleTickets)
 })
 
-// Rota para estatísticas
-app.get("/api/stats", (req, res) => {
-  try {
-    const stats = {
-      total: ticketsData.length,
-      open: ticketsData.filter((t) => t.status === "open").length,
-      closed: ticketsData.filter((t) => t.status === "closed").length,
-      pending: ticketsData.filter((t) => t.status === "pending").length,
-      avgRating:
-        ticketsData.filter((t) => t.rating > 0).reduce((sum, t) => sum + t.rating, 0) /
-          ticketsData.filter((t) => t.rating > 0).length || 0,
-    }
+app.get("/api/tickets/:ticketId/messages", (req, res) => {
+  const { ticketId } = req.params
+  const ticket = sampleTickets.find((t) => t.id === ticketId)
 
-    res.json({
-      success: true,
-      stats: stats,
-    })
-  } catch (error) {
-    console.error("Erro ao buscar estatísticas:", error)
-    res.status(500).json({
-      success: false,
-      error: "Erro interno do servidor",
-    })
+  if (!ticket) {
+    return res.status(404).json({ error: "Ticket não encontrado" })
   }
+
+  // Gerar mensagens de exemplo baseadas na categoria
+  const messages = []
+
+  // Mensagem inicial do usuário
+  let initialMessage = ""
+  switch (ticket.category) {
+    case "Up de Patente":
+      initialMessage =
+        "Olá! Gostaria de solicitar um up de patente. Estou há bastante tempo na corporação e acredito que mereço uma promoção."
+      break
+    case "Dúvidas":
+      initialMessage = "Tenho algumas dúvidas sobre o regulamento da corporação. Podem me ajudar?"
+      break
+    case "Corregedoria":
+      initialMessage = "Preciso reportar uma situação que presenciei. Como devo proceder?"
+      break
+    default:
+      initialMessage = "Olá! Preciso de ajuda com uma questão."
+  }
+
+  messages.push({
+    id: "msg-1",
+    author: {
+      name: ticket.user.name,
+      avatar: ticket.user.avatar,
+      isStaff: false,
+    },
+    content: initialMessage,
+    timestamp: ticket.createdAt,
+    attachments: [],
+  })
+
+  // Resposta do staff
+  let staffResponse = ""
+  switch (ticket.category) {
+    case "Up de Patente":
+      staffResponse = "Olá! Vou analisar sua solicitação de promoção. Pode me enviar seus dados e tempo de serviço?"
+      break
+    case "Dúvidas":
+      staffResponse =
+        "Olá! Ficarei feliz em esclarecer suas dúvidas. Qual ponto específico do regulamento você gostaria de saber?"
+      break
+    case "Corregedoria":
+      staffResponse =
+        "Olá! Obrigado por reportar. Vou encaminhar para a corregedoria. Pode me dar mais detalhes sobre o ocorrido?"
+      break
+    default:
+      staffResponse = "Olá! Como posso ajudá-lo hoje?"
+  }
+
+  messages.push({
+    id: "msg-2",
+    author: {
+      name: ticket.closedBy,
+      avatar: "https://cdn.discordapp.com/embed/avatars/1.png",
+      isStaff: true,
+    },
+    content: staffResponse,
+    timestamp: new Date(new Date(ticket.createdAt).getTime() + 5 * 60 * 1000).toISOString(),
+    attachments: [],
+  })
+
+  // Mensagem de resolução
+  let resolutionMessage = ""
+  switch (ticket.category) {
+    case "Up de Patente":
+      resolutionMessage =
+        "Após análise, sua promoção foi aprovada! Parabéns pelo novo cargo. As alterações já foram aplicadas."
+      break
+    case "Dúvidas":
+      resolutionMessage =
+        "Espero ter esclarecido todas suas dúvidas! Se precisar de mais alguma coisa, não hesite em abrir outro ticket."
+      break
+    case "Corregedoria":
+      resolutionMessage =
+        "O caso foi devidamente registrado e encaminhado para investigação. Obrigado pela colaboração."
+      break
+    default:
+      resolutionMessage = "Problema resolvido com sucesso! Obrigado por entrar em contato."
+  }
+
+  messages.push({
+    id: "msg-3",
+    author: {
+      name: ticket.closedBy,
+      avatar: "https://cdn.discordapp.com/embed/avatars/1.png",
+      isStaff: true,
+    },
+    content: resolutionMessage,
+    timestamp: new Date(new Date(ticket.closedAt).getTime() - 2 * 60 * 1000).toISOString(),
+    attachments: [],
+  })
+
+  res.json(messages)
 })
 
-// Rota principal com fallback
+// Rota principal
 app.get("/", (req, res) => {
   const indexPath = path.join(__dirname, "public", "index.html")
 
-  // Verificar se o arquivo existe
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath)
   } else {
-    // Fallback: servir HTML inline
     res.send(`
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord Tickets Dashboard</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #1a1a2e; color: white; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .logo { width: 60px; height: 60px; border-radius: 12px; margin-bottom: 10px; }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; text-align: center; }
-        .stat-number { font-size: 2rem; font-weight: bold; color: #667eea; }
-        .table-container { background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
-        .table-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        th { background: rgba(102,126,234,0.2); }
-        .loading { text-align: center; padding: 50px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <img src="https://media.discordapp.net/attachments/1414044312890769448/1414399293476966430/dacacacscs.png" alt="Logo" class="logo">
-            <h1>Discord Tickets Dashboard</h1>
-            <p>Sistema de Gerenciamento de Tickets</p>
-        </div>
-        
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-number" id="totalTickets">0</div>
-                <div>Total de Tickets</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="openTickets">0</div>
-                <div>Tickets Abertos</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="closedTickets">0</div>
-                <div>Tickets Fechados</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="pendingTickets">0</div>
-                <div>Tickets Pendentes</div>
-            </div>
-        </div>
-        
-        <div class="table-container">
-            <div class="table-header">
-                <h2>Lista de Tickets</h2>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Usuário</th>
-                        <th>Tipo</th>
-                        <th>Status</th>
-                        <th>Criado em</th>
-                    </tr>
-                </thead>
-                <tbody id="ticketsTable">
-                    <tr><td colspan="5" class="loading">Carregando tickets...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <script>
-        // Carregar dados
-        async function loadData() {
-            try {
-                const response = await fetch('/api/tickets')
-                const data = await response.json()
-                
-                if (data.success) {
-                    updateStats(data.tickets)
-                    renderTickets(data.tickets.slice(0, 10))
-                }
-            } catch (error) {
-                console.error('Erro:', error)
-                document.getElementById('ticketsTable').innerHTML = 
-                    '<tr><td colspan="5" style="text-align: center; color: #f56565;">Erro ao carregar dados</td></tr>'
-            }
-        }
-        
-        function updateStats(tickets) {
-            const stats = {
-                total: tickets.length,
-                open: tickets.filter(t => t.status === 'open').length,
-                closed: tickets.filter(t => t.status === 'closed').length,
-                pending: tickets.filter(t => t.status === 'pending').length
-            }
-            
-            document.getElementById('totalTickets').textContent = stats.total
-            document.getElementById('openTickets').textContent = stats.open
-            document.getElementById('closedTickets').textContent = stats.closed
-            document.getElementById('pendingTickets').textContent = stats.pending
-        }
-        
-        function renderTickets(tickets) {
-            const tbody = document.getElementById('ticketsTable')
-            
-            if (tickets.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum ticket encontrado</td></tr>'
-                return
-            }
-            
-            tbody.innerHTML = tickets.map(ticket => \`
-                <tr>
-                    <td>#\${ticket.id}</td>
-                    <td>\${ticket.username}</td>
-                    <td>\${ticket.type}</td>
-                    <td>\${ticket.status}</td>
-                    <td>\${new Date(ticket.createdAt).toLocaleDateString('pt-BR')}</td>
-                </tr>
-            \`).join('')
-        }
-        
-        // Carregar dados ao inicializar
-        document.addEventListener('DOMContentLoaded', loadData)
-        
-        // Auto-refresh a cada 30 segundos
-        setInterval(loadData, 30000)
-    </script>
-</body>
-</html>
+      <h1>Dashboard de Tickets</h1>
+      <p>Arquivo index.html não encontrado. Verifique a estrutura de arquivos.</p>
+      <p>Caminho esperado: ${indexPath}</p>
     `)
   }
 })
 
-// Health check para o Render
+// Health check
 app.get("/health", (req, res) => {
   res.json({
     status: "OK",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    tickets: sampleTickets.length,
   })
 })
 
@@ -411,8 +269,9 @@ app.use((req, res) => {
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`🚀 Dashboard rodando em http://localhost:${PORT}`)
-  console.log(`📊 API disponível em http://localhost:${PORT}/api/tickets`)
-  console.log(`🎨 Interface moderna carregada com sucesso!`)
+  console.log(`📊 API disponível em http://localhost:${PORT}/api/tickets/closed`)
+  console.log(`🎫 Total de tickets de exemplo: ${sampleTickets.length}`)
+  console.log(`🏷️ Categorias: Up de Patente, Dúvidas, Corregedoria`)
   console.log(`🌍 Ambiente: ${process.env.NODE_ENV || "development"}`)
 })
 
